@@ -18,6 +18,7 @@ Basic beat detection & animation lab.
 npm i -g pnpm
 ```
 
+> install `npm` dependencies
 ```bash
 pnpm i
 ```
