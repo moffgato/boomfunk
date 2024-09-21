@@ -1,5 +1,7 @@
 ## Boomfunk
 
+Basic beat detection & animation lab.
+
 ![demo_video](docs/demo.gif)
 
 
