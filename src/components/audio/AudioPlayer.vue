@@ -34,7 +34,26 @@
   </div>
 </template>
 
+
+
+
 <script setup lang="ts">
+
+/*
+
+  script manages audio, loads it, play/pause etc
+  we emit an event for 'beat' so BeatGrid.vue can trigger on it.
+  works totally flawlessy, the DOM loves being dominated.
+
+  we also control the amount of elements in the BeatGrid from this component.
+
+  the animation has some minor logic around energy and intensity.
+  essentially on beat we animated a % of the elements relative to energy.
+  at certain cumulative energy we slam animation on the rest of the elements to create a background(?) feel.
+
+  */
+
+
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Slider } from '../ui/slider'
 import { Button } from '../ui/button'
@@ -59,11 +78,10 @@ let numOfElements = ref([0])
 
 
 
-// const AUDIO_URL = ref('/hiroyuki_sawano_attack_on_titan_suite.mp3')
+
 const mp3Options = ref([
-  { label: 'sistar_so_cool', value: '/sistar_so_cool.mp3' },
   { label: 'When GM', value: '/when_gm.mp3', },
-  { label: 'attack_on_titan', value: '/hiroyuki_sawano_attack_on_titan_suite.mp3', },
+//  { label: 'attack_on_titan', value: '/hiroyuki_sawano_attack_on_titan_suite.mp3', },
   { label: 'caravan_place__lone_digger', value: '/caravan_place__lone_digger.mp3' },
   { label: 'True Survivor', value: '/hoff_true_survivor.mp3' },
   { label: 'How Bad', value: '/lorax_how_bad.mp3' },
@@ -207,12 +225,13 @@ const togglePlay = async () => {
     stopAudio()
     isPlaying.value = false
     // suspend AudioContext to comply with browser policies
+    // meme/docs:
     // https://developer.chrome.com/blog/autoplay/#webaudio
     if (audioCtx && audioCtx.state === 'running') {
       await audioCtx.suspend()
     }
   } else {
-    // Resume AudioContext if suspended
+    // resume AudioContext if suspended
     if (audioCtx && audioCtx.state === 'suspended') {
       await audioCtx.resume()
     }
