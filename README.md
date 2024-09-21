@@ -1,6 +1,6 @@
 ## Boomfunk
 
-[![demo_video](./docs/charizard_chillin.png)](./docs/demo_stabby_kitty_3.mp4)
+![demo_video](docs/demo.gif)
 
 
 - [Install](###install)
