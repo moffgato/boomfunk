@@ -2,8 +2,9 @@
 
 Basic beat detection & animation lab.
 
-![demo_video](docs/demo.gif)
-
+<div style="text-align:center">
+  <img src="docs/demo-wide-final.gif" alt="demo_video" style="width:75%; height:auto;">
+</div>
 
 - [Install](###install)
 - [Dev](###run-dev)
