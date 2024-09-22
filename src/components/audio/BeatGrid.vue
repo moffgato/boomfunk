@@ -7,7 +7,7 @@
        :key="index"
        src="/solana_icon.svg"
        :class="[
-         'audio-grid-item w-8 h-8 m-1 transition-margin duration-margin-500 transition-transform transition-color duration-color-500 transition-opacity duration-opacity-500 transition-filter durtation-filter-500 ease hover:hue-rotate-180',
+         'audio-grid-item w-8 h-8 m-1  transition-margin duration-margin-500 transition-transform transition-color duration-color-500 transition-opacity duration-opacity-500 transition-filter durtation-filter-500 ease hover:hue-rotate-180',
 
          { 'animate-pulse-scale': pulsingElements.includes(index) || (triggerEvenPulse && index % 2 === 0) },
          { 'animate-no-pulse': !pulsingElements.includes(index) && currentEnergy > 100, },
@@ -44,8 +44,6 @@ watch(() => props.numOfElements, (newValue) => {
   gridItems.value = Array.from({ length: newValue[0] }, (_, i) => (i + 1).toString())
 })
 
-
-
 const isPulsing = ref(false)
 // lock to prevent overlapping animations
 const isAnimating = ref(false)
@@ -72,7 +70,6 @@ watch(() => props.isPlaying, (nextState) => {
     currentEnergy.value = 0.0
   }
 });
-
 
 // get a random subset of elements to pulse
 const getRandomElements = (count: number, total: number) => {

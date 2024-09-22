@@ -60,7 +60,7 @@ const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
     toast({
       title: 'Invalid Selection',
       description: 'Please select a valid track from the dropdown.',
-      variant: 'error',
+      variant: 'destructive',
     })
     return
   }
@@ -72,7 +72,7 @@ const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
     toast({
       title: 'Playback Stopped',
       description: `Stopped playing before switching to a new track.`,
-      variant: 'info',
+      variant: 'default',
     })
   }
 
@@ -85,7 +85,7 @@ const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
     toast({
       title: 'Now Playing',
       description: `Switched to "${getCurrentSongLabel()}"`,
-      variant: 'success',
+      variant: 'default',
     })
   }
 }, 300)
@@ -130,7 +130,7 @@ const loadAudio = async (url: string) => {
     toast({
       title: 'Load Error',
       description: 'Failed to load the selected track. Please try another one.',
-      variant: 'error',
+      variant: 'destructive',
     })
   } finally {
     isLoading.value = false
@@ -192,7 +192,7 @@ const handleAudioEnded = () => {
   toast({
     title: 'Playback Finished',
     description: `"${getCurrentSongLabel()}" has finished playing.`,
-    variant: 'info',
+    variant: 'default',
   })
 
   console.log('Playback state has been reset.')
@@ -215,7 +215,7 @@ const playAudio = async () => {
       toast({
         title: 'Playback Error',
         description: 'No audio loaded to play.',
-        variant: 'error',
+        variant: 'destructive',
       })
       return
     }
@@ -247,7 +247,7 @@ const playAudio = async () => {
     toast({
       title: 'Playback Started',
       description: `Now playing "${getCurrentSongLabel()}".`,
-      variant: 'success',
+      variant: 'default',
     })
 
   } catch (error) {
@@ -256,7 +256,7 @@ const playAudio = async () => {
     toast({
       title: 'Playback Error',
       description: 'An error occurred during playback.',
-      variant: 'error',
+      variant: 'destructive',
     })
   }
 }
@@ -298,7 +298,7 @@ const stopAudio = () => {
   toast({
     title: 'Playback Paused',
     description: `Paused "${getCurrentSongLabel()}".`,
-    variant: 'info',
+    variant: 'default',
   })
 }
 
@@ -322,7 +322,7 @@ const togglePlay = async () => {
           toast({
             title: 'Audio Context Error',
             description: 'Failed to resume audio context.',
-            variant: 'error',
+            variant: 'destructive',
           })
           return
         }
@@ -339,7 +339,7 @@ const togglePlay = async () => {
     toast({
       title: 'Toggle Error',
       description: 'An error occurred while toggling playback.',
-      variant: 'error',
+      variant: 'destructive',
     })
   }
 }
@@ -361,13 +361,13 @@ const resetAudio = async () => {
       toast({
         title: 'Playback Reset',
         description: `Restarted "${getCurrentSongLabel()}".`,
-        variant: 'success',
+        variant: 'default',
       })
     } else {
       toast({
         title: 'Playback Reset',
         description: `"${getCurrentSongLabel()}" is reset to the beginning.`,
-        variant: 'info',
+        variant: 'default',
       })
     }
 
@@ -378,7 +378,7 @@ const resetAudio = async () => {
     toast({
       title: 'Reset Error',
       description: 'An error occurred while resetting playback.',
-      variant: 'error',
+      variant: 'destructive',
     })
   }
 }
@@ -421,7 +421,7 @@ const removeElements = () => {
       toast({
         title: 'Visuals Cleared',
         description: 'All visual elements have been removed.',
-        variant: 'info',
+        variant: 'default',
       })
     }
   }, 10)
@@ -476,7 +476,7 @@ onMounted(async () => {
     toast({
       title: 'No Audio',
       description: 'Please select an audio track to begin.',
-      variant: 'warning',
+      variant: 'destructive',
     })
   }
 
