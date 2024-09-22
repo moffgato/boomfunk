@@ -9,7 +9,7 @@
         'audio-grid-item w-8 h-8 m-1 transition-margin duration-margin-500 transition-transform transition-color duration-color-500 transition-opacity duration-opacity-500 transition-filter durtation-filter-500 ease hover:hue-rotate-180',
 
         { 'animate-pulse-scale': pulsingElements.includes(index) || (triggerEvenPulse.value && index % 2 === 0) },
-        { 'animate-no-pulse': !pulsingElements.includes(index) && currentEnergy > 42, },
+        { 'animate-no-pulse': !pulsingElements.includes(index) && currentEnergy > 101, },
         { 'animate-fade-in': true },
       ]"
       :style="{
