@@ -1,57 +1,4 @@
-<template>
-  <div class="player">
-    <div class="flex">
-      <div class="flex flex-col justify-center w-full w-[300px] gap-0">
-        <div class="flex justify-center gap-1">
-          <AudioSelect
-            v-model='AUDIO_URL'
-            :audioOptions='mp3Options'
-          />
-          <div class="flex justify-center sounding-butts">
-            <Button
-              variant="outline"
-              class="text-white px-4 py-2 rounded mb-4"
-              @click="togglePlay"
-              aria-label="Play or Pause Audio"
-              >
-              {{ isPlaying ? "Pause" : "Play" }}
-            </Button>
-            <Button
-              variant="outline"
-              class="text-white px-4 py-2 rounded mb-4"
-              @click="resetAudio"
-              aria-label="Reset Audio"
-              >
-              Reset
-            </Button>
-          </div>
-        </div>
-
-        <Separator />
-
-        <div class="flex justify-center gap-2">
-          <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${highestEnergy.toFixed(8)}` }}</code>
-          <Separator orientation="vertical" />
-          <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${currentEnergy.toFixed(8)}` }}</code>
-        </div>
-
-        <Separator />
-
-        <!-- Error Message -->
-        <div v-if="errorMessage" class="error-message">
-          {{ errorMessage }}
-        </div>
-      </div>
-    </div>
-    <BeatGrid :isPlaying='isPlaying' :numOfElements="numOfElements" />
-  </div>
-</template>
-
 <script setup lang="ts">
-/*
-  Script manages audio loading, playback, beat detection, etc.
-*/
-
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Button } from '../ui/button'
 import { Separator } from '../ui/separator'
@@ -61,6 +8,10 @@ import { EventBus } from '../../lib'
 import { fetchAudioBuffer, getAudioContext, closeAudioContext } from '../../lib/utils'
 import Meyda from 'meyda'
 import debounce from 'lodash.debounce'
+import { useToast } from '@/components/ui/toast/use-toast'
+
+
+const { toast } = useToast()
 
 
 type MeydaAnalyzer = any
@@ -73,7 +24,7 @@ let audioCtx: AudioContext | null = null
 let source: AudioBufferSourceNode | null = null
 let analyser: AnalyserNode | null = null
 
-let meydaAnalyzer: MeydaAnalyzer | null = null;
+let meydaAnalyzer: MeydaAnalyzer | null = null
 let startTime: number = 0
 let pauseTime: number = 0
 let audioBuffer: AudioBuffer | null = null
@@ -82,12 +33,13 @@ const numOfElements = ref([0])
 
 const lastBeat = ref(0)
 const currentEnergy = ref(0.0)
+const previousEnergy = ref(0.0)
 const highestEnergy = ref(0.0)
 
 const errorMessage = ref<string | null>(null)
 
 const mp3Options = ref([
-  { label: 'When GM', value: '/when_gm.mp3', },
+  { label: 'When GM', value: '/when_gm.mp3' },
 
   { label: 'caravan_place__lone_digger', value: '/caravan_place__lone_digger.mp3' },
   { label: 'True Survivor', value: '/hoff_true_survivor.mp3' },
@@ -101,10 +53,19 @@ const getSongIndex = (label: string): number => {
 }
 const AUDIO_URL = ref(mp3Options.value[getSongIndex('caravan_place__lone_digger')].value)
 
+
+const audioBufferCache = ref<Record<string, AudioBuffer>>({})
+
+
 const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
   if (!newAudioURL || typeof newAudioURL !== 'string') {
     console.error('Invalid AUDIO_URL:', newAudioURL)
     errorMessage.value = 'Invalid audio selection. Please choose a valid track.'
+    toast({
+      title: 'Invalid Selection',
+      description: 'Please select a valid track from the dropdown.',
+      variant: 'error',
+    })
     return
   }
 
@@ -112,6 +73,11 @@ const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
 
   if (wasPlaying) {
     stopAudio()
+    toast({
+      title: 'Playback Stopped',
+      description: `Stopped playing before switching to a new track.`,
+      variant: 'info',
+    })
   }
 
   pauseTime = 0
@@ -120,6 +86,11 @@ const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
 
   if (wasPlaying) {
     await playAudio()
+    toast({
+      title: 'Now Playing',
+      description: `Switched to "${getCurrentSongLabel()}"`,
+      variant: 'success',
+    })
   }
 }, 300)
 
@@ -129,18 +100,11 @@ watch(AUDIO_URL, (newAudioURL, oldAudioURL) => {
   debouncedLoadAudio(newAudioURL)
 })
 
-const MAX_ELEMENT_COUNT = 768
 
-const meydaConfig = {
-  bufferSize: 512,
-  featureExtractors: ['energy']
+const getCurrentSongLabel = (): string => {
+  const currentOption = mp3Options.value.find(opt => opt.value === AUDIO_URL.value)
+  return currentOption ? currentOption.label : 'Unknown'
 }
-
-const energyThreshold = ref(0.5)
-const previousEnergy = ref(0)
-
-
-const audioBufferCache = ref<Record<string, AudioBuffer>>({})
 
 
 const loadAudio = async (url: string) => {
@@ -167,6 +131,11 @@ const loadAudio = async (url: string) => {
   } catch (error) {
     console.error('Error loading audio:', error)
     errorMessage.value = 'Failed to load audio. Please select a different track.'
+    toast({
+      title: 'Load Error',
+      description: 'Failed to load the selected track. Please try another one.',
+      variant: 'error',
+    })
   } finally {
     isLoading.value = false
   }
@@ -179,11 +148,11 @@ const initMeyda = () => {
   meydaAnalyzer = Meyda.createMeydaAnalyzer({
     audioContext: audioCtx,
     source: analyser,
-    bufferSize: meydaConfig.bufferSize,
-    featureExtractors: meydaConfig.featureExtractors,
+    bufferSize: 512,
+    featureExtractors: ['energy'],
     callback: (features: MeydaFeatures) => {
       const currentEnergyValue = features.energy
-      if (currentEnergyValue > energyThreshold.value && currentEnergyValue > previousEnergy.value) {
+      if (currentEnergyValue > 0.5 && currentEnergyValue > previousEnergy.value) {
 
         EventBus.emit('beat', { energy: currentEnergyValue })
       }
@@ -194,7 +163,6 @@ const initMeyda = () => {
   meydaAnalyzer.start()
   console.log('Meyda Analyzer started.')
 }
-
 
 
 const playAudio = async () => {
@@ -211,6 +179,11 @@ const playAudio = async () => {
     if (!audioBuffer) {
       console.error('No audio buffer loaded. Cannot play audio.')
       errorMessage.value = 'No audio loaded. Please select a track.'
+      toast({
+        title: 'Playback Error',
+        description: 'No audio loaded to play.',
+        variant: 'error',
+      })
       return
     }
 
@@ -235,9 +208,21 @@ const playAudio = async () => {
 
     initMeyda()
 
+
+    toast({
+      title: 'Playback Started',
+      description: `Now playing "${getCurrentSongLabel()}".`,
+      variant: 'success',
+    })
+
   } catch (error) {
     console.error('Failed to play audio or detect beats:', error)
     errorMessage.value = 'Failed to play audio. Please try again.'
+    toast({
+      title: 'Playback Error',
+      description: 'An error occurred during playback.',
+      variant: 'error',
+    })
   }
 }
 
@@ -273,6 +258,13 @@ const stopAudio = () => {
       console.error('Error suspending AudioContext:', error)
     })
   }
+
+
+  toast({
+    title: 'Playback Paused',
+    description: `Paused "${getCurrentSongLabel()}".`,
+    variant: 'info',
+  })
 }
 
 
@@ -285,7 +277,6 @@ const togglePlay = async () => {
       console.log('Playback paused.')
     } else {
 
-
       if (audioCtx && audioCtx.state === 'suspended') {
         try {
           await audioCtx.resume()
@@ -293,6 +284,11 @@ const togglePlay = async () => {
         } catch (error) {
           console.error('Error resuming AudioContext:', error)
           errorMessage.value = 'Failed to resume audio context.'
+          toast({
+            title: 'Audio Context Error',
+            description: 'Failed to resume audio context.',
+            variant: 'error',
+          })
           return
         }
       }
@@ -305,6 +301,11 @@ const togglePlay = async () => {
   } catch (error) {
     console.error('Error toggling playback:', error)
     errorMessage.value = 'An error occurred while toggling playback.'
+    toast({
+      title: 'Toggle Error',
+      description: 'An error occurred while toggling playback.',
+      variant: 'error',
+    })
   }
 }
 
@@ -321,12 +322,29 @@ const resetAudio = async () => {
 
     if (wasPlaying) {
       await playAudio()
+      isPlaying.value = true
+      toast({
+        title: 'Playback Reset',
+        description: `Restarted "${getCurrentSongLabel()}".`,
+        variant: 'success',
+      })
+    } else {
+      toast({
+        title: 'Playback Reset',
+        description: `"${getCurrentSongLabel()}" is reset to the beginning.`,
+        variant: 'info',
+      })
     }
 
     console.log('Playback reset to the beginning.')
   } catch (error) {
     console.error('Error resetting playback:', error)
     errorMessage.value = 'An error occurred while resetting playback.'
+    toast({
+      title: 'Reset Error',
+      description: 'An error occurred while resetting playback.',
+      variant: 'error',
+    })
   }
 }
 
@@ -338,58 +356,62 @@ onBeforeUnmount(async () => {
 })
 
 
-
-let removeInterval: any = null;
-let addInterval: any = null;
+let removeInterval: any = null
+let addInterval: any = null
 
 
 const stopIntervals = () => {
   if (removeInterval) {
-    clearInterval(removeInterval);
-    removeInterval = null;
+    clearInterval(removeInterval)
+    removeInterval = null
   }
   if (addInterval) {
-    clearInterval(addInterval);
-    addInterval = null;
+    clearInterval(addInterval)
+    addInterval = null
   }
-};
+}
+
 
 const removeElements = () => {
-  stopIntervals();
+  stopIntervals()
 
   stopAudio()
   isPlaying.value = false
 
   removeInterval = setInterval(() => {
     if (numOfElements.value[0] > 0) {
-      numOfElements.value = [numOfElements.value[0] - 4];
+      numOfElements.value = [numOfElements.value[0] - 4]
     } else {
-      clearInterval(removeInterval);
+      clearInterval(removeInterval)
+      toast({
+        title: 'Visuals Cleared',
+        description: 'All visual elements have been removed.',
+        variant: 'info',
+      })
     }
-  }, 10);
-};
+  }, 10)
+}
 
 
 const handleDeadBeat = () => {
-  const lastBeatValue = !!lastBeat?.value ? lastBeat.value : 0
+  const lastBeatValue = lastBeat.value || 0
   const timeSinceLastBeat = Date.now() - lastBeatValue
 
   if (timeSinceLastBeat >= 1500) {
     if (isPlaying.value) {
-      removeElements();
+      removeElements()
     }
   }
-};
+}
 
 
 watch(lastBeat, (newValue) => {
-  if (!newValue) return;
-
+  if (!newValue) return
 
   setTimeout(() => {
     handleDeadBeat()
   }, 1500)
-});
+})
 
 
 watch(isPlaying, (nextState) => {
@@ -400,16 +422,15 @@ watch(isPlaying, (nextState) => {
   }
 
   if (nextState) {
-
     addInterval = setInterval(() => {
-      if (numOfElements.value[0] < MAX_ELEMENT_COUNT) {
-        numOfElements.value = [numOfElements.value[0] + 4];
+      if (numOfElements.value[0] < 768) {
+        numOfElements.value = [numOfElements.value[0] + 4]
       } else {
-        clearInterval(addInterval);
+        clearInterval(addInterval)
       }
-    }, 10);
+    }, 10)
   }
-});
+})
 
 
 onMounted(async () => {
@@ -417,10 +438,14 @@ onMounted(async () => {
     await loadAudio(AUDIO_URL.value)
   } else {
     errorMessage.value = 'No audio selected.'
+    toast({
+      title: 'No Audio',
+      description: 'Please select an audio track to begin.',
+      variant: 'warning',
+    })
   }
 
   EventBus.on('beat', (beat) => {
-
     currentEnergy.value = beat?.energy || 0
     if (highestEnergy.value < currentEnergy.value) {
       highestEnergy.value = beat.energy
@@ -431,10 +456,66 @@ onMounted(async () => {
 
 
 onBeforeUnmount(() => {
-  EventBus.off('beat');
-  stopIntervals();
-});
+  EventBus.off('beat')
+  stopIntervals()
+})
 </script>
+
+<template>
+  <div class="player">
+    <div class="flex">
+      <div class="flex flex-col justify-center w-full w-[300px] gap-0">
+        <div class="flex justify-center gap-1">
+          <AudioSelect
+            v-model="AUDIO_URL"
+            :audioOptions="mp3Options"
+          />
+          <div class="flex justify-center sounding-butts gap-1">
+            <Button
+              variant="outline"
+              class="text-white px-4 py-2 rounded mb-4"
+              @click="togglePlay"
+              aria-label="Play or Pause Audio"
+            >
+              {{ isPlaying ? "Pause" : "Play" }}
+            </Button>
+            <Button
+              variant="outline"
+              class="text-white px-4 py-2 rounded mb-4"
+              @click="resetAudio"
+              aria-label="Reset Audio"
+            >
+              Reset
+            </Button>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div class="flex justify-center gap-2">
+          <code class="text-slate-500 p-1 select-none flex flex-nowrap">
+            {{ `${highestEnergy.toFixed(8)}` }}
+          </code>
+          <Separator orientation="vertical" />
+          <code class="text-slate-500 p-1 select-none flex flex-nowrap">
+            {{ `${currentEnergy.toFixed(8)}` }}
+          </code>
+        </div>
+
+        <Separator />
+
+        <div v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </div>
+
+        <div v-if="isLoading" class="loading-spinner">
+          Loading...
+        </div>
+      </div>
+    </div>
+    <BeatGrid :isPlaying="isPlaying" :numOfElements="numOfElements" />
+  </div>
+</template>
 
 <style scoped>
 .player {
@@ -450,6 +531,11 @@ onBeforeUnmount(() => {
   margin-top: 1rem;
   text-align: center;
 }
-</style>
 
+.loading-spinner {
+  color: white;
+  font-size: 1rem;
+  margin-top: 1rem;
+}
+</style>
 
