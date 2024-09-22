@@ -17,7 +17,7 @@ theme.value = 'dark'
           div(:key='$route.path')
             component(:is='Component')
 
-  Toaster(position='bottom-right' theme='dark' closeButton)
+  toaster
 
 </template>
 
