@@ -19,17 +19,26 @@
   <div class="player">
     <div class="flex gap-2 items-baseline">
 
+    <div class="flex justify-between w-full min-w-[300px] gap-2">
 
-    <Button
-       v-show='!isPlaying'
-       variant="outline"
-       class="text-white px-4 py-2 rounded hover:bg-red-600 mb-4"
-       @click="togglePlay"
-       aria-label="Play or Pause Audio"
-     >
-      {{ isPlaying ? "Pause" : "Play" }}
-    </Button>
-      <code class="text-slate-500 p-1 select-none">{{ `${highestEnergy} | ${currentEnergy}` }}</code>
+      <div class="flex sounding-butts">
+        <Button
+          variant="outline"
+          class="text-white px-4 py-2 rounded hover:bg-red-600 mb-4"
+          @click="togglePlay"
+          aria-label="Play or Pause Audio"
+          >
+          {{ isPlaying ? "Pause" : "Play" }}
+        </Button>
+      </div>
+
+      <div class="flex w-[200px] gap-2">
+        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${highestEnergy}` }}</code>
+        <Separator orientation="vertical" class="h-[69%]" />
+        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${currentEnergy}` }}</code>
+      </div>
+
+    </div>
 
     </div>
     <BeatGrid :isPlaying='isPlaying' :numOfElements="numOfElements" />
@@ -58,6 +67,7 @@
 
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Button } from '../ui/button'
+import { Separator } from '../ui/separator'
 import BeatGrid from './BeatGrid.vue'
 import { EventBus } from '../../lib'
 import { fetchAudioBuffer } from '../../lib/utils'
@@ -255,6 +265,7 @@ const removeElements = () => {
   stopIntervals(); // Stop any other intervals
 
   stopAudio()
+  isPlaying.value = false
   // Start a removal interval
   removeInterval = setInterval(() => {
     if (numOfElements.value[0] > 0) {
