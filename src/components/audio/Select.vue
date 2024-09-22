@@ -10,9 +10,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+
+type audioOption = {
+  label: string,
+  value: string,
+}
+
+
 const props = defineProps({
   audioOptions: {
-    type: Array,
+    type: Array<audioOption>,
     default: () => []
   },
   modelValue: {
@@ -28,7 +35,7 @@ const handleChange = (value: string) => {
   console.log({ changedAudioUrl: value })
   emit('update:modelValue', value)
 }
-watch(() => props.modelValue.value, (newValue, oldValue) => {
+watch(() => props.modelValue, (newValue, oldValue) => {
   console.log({ newValue, oldValue })
 });
 

@@ -2,19 +2,19 @@
   <div class="group beat-grid flex flex-wrap justify-center items-center">
     <img
       v-show="gridItems.length"
-      v-for="(item, index) in gridItems"
+      v-for="(_, index) in gridItems"
       :key="index"
       src="/solana_icon.svg"
       :class="[
         'audio-grid-item w-8 h-8 m-1 transition-margin duration-margin-500 transition-transform transition-color duration-color-500 transition-opacity duration-opacity-500 transition-filter durtation-filter-500 ease hover:hue-rotate-180',
 
-        { 'animate-pulse-scale': pulsingElements.includes(index) || (triggerEvenPulse.value && index % 2 === 0) },
-        { 'animate-no-pulse': !pulsingElements.includes(index) && currentEnergy > 101, },
+        { 'animate-pulse-scale': pulsingElements.includes(index) || (triggerEvenPulse && index % 2 === 0) },
+        { 'animate-no-pulse': !pulsingElements.includes(index) && currentEnergy > 100, },
         { 'animate-fade-in': true },
       ]"
       :style="{
-        transform: pulsingElements.includes(index) ? `scale(${currentScale.value})` : 'scale(1)',
-        animationDuration: `${currentDuration.value}s`
+        transform: pulsingElements.includes(index) ? `scale(${currentScale})` : 'scale(1)',
+        animationDuration: `${currentDuration}s`
       }"
       alt="Solana Icon"
     />
@@ -32,7 +32,7 @@ const props = defineProps({
     default: false,
   },
   numOfElements: {
-    type: Array<Number>,
+    type: Array<number>,
     default: [12],
   }
 });
@@ -72,13 +72,21 @@ watch(() => props.isPlaying, (nextState) => {
   }
 });
 
-watch(() => cumulativeEnergy.value, (newValue: any) => {
-  console.log({ cumEnergy: newValue })
-})
+
+
+// watch(() => currentEnergy.value, (energy) => {
+//
+//   console.log({ 'energy!': energy, })
+//
+// })
+
+// watch(cumulativeEnergy, (newValue: any) => {
+//   console.log({ cumEnergy: newValue })
+// })
 
 // get a random subset of elements to pulse
 const getRandomElements = (count: number, total: number) => {
-  const indices = []
+  const indices: number[] = []
   while (indices.length < count) {
     const randomIndex = Math.floor(Math.random() * total)
     if (!indices.includes(randomIndex)) {
@@ -113,7 +121,7 @@ const triggerPulse = (energy: number) => {
   const numOfEl = Math.floor(energy >= 2 ? energy : 2)
   pulsingElements.value = getRandomElements(numOfEl, gridItems.value.length)
 
-  console.log({ energy })
+  // console.log({ energy })
 
   isPulsing.value = true
   const colorClasses = [
@@ -220,7 +228,7 @@ onBeforeUnmount(() => {
 }
 
 .animate-element-enter {
-  animation: zoomIn .2s ease;
+  animation:  .2s ease;
 }
 
 </style>

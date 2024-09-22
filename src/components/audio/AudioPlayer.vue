@@ -21,6 +21,7 @@
 
 
     <Button
+       v-show='!isPlaying'
        variant="outline"
        class="text-white px-4 py-2 rounded hover:bg-red-600 mb-4"
        @click="togglePlay"
@@ -28,6 +29,7 @@
      >
       {{ isPlaying ? "Pause" : "Play" }}
     </Button>
+      <code class="text-slate-500 p-1 select-none">{{ `${highestEnergy} | ${currentEnergy}` }}</code>
 
     </div>
     <BeatGrid :isPlaying='isPlaying' :numOfElements="numOfElements" />
@@ -55,29 +57,32 @@
 
 
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { Slider } from '../ui/slider'
 import { Button } from '../ui/button'
-import { Label } from '../ui/label'
 import BeatGrid from './BeatGrid.vue'
-import AudioSelect from './Select.vue'
 import { EventBus } from '../../lib'
 import { fetchAudioBuffer } from '../../lib/utils'
 import Meyda from 'meyda'
 
+// jesus will get you in the end.
+type MeydaAnalyzer = any
+type MeydaFeatures = any
 
-const isPlaying = ref(false)
+
+let isPlaying = ref(false)
 let audioCtx: AudioContext | null = null
 let source: AudioBufferSourceNode | null = null
 let analyser: AnalyserNode | null = null
-let meydaAnalyzer: Meyda.MeydaAnalyzer | null = null;
+
+let meydaAnalyzer: MeydaAnalyzer | null = null;
 let startTime: number = 0
 let pauseTime: number = 0
 let audioBuffer: AudioBuffer | null = null
 
 let numOfElements = ref([0])
 
-
-
+let lastBeat = ref(0)
+let currentEnergy = ref(0.0)
+let highestEnergy = ref(0.0)
 
 const mp3Options = ref([
   { label: 'When GM', value: '/when_gm.mp3', },
@@ -85,37 +90,18 @@ const mp3Options = ref([
   { label: 'caravan_place__lone_digger', value: '/caravan_place__lone_digger.mp3' },
   { label: 'True Survivor', value: '/hoff_true_survivor.mp3' },
   { label: 'How Bad', value: '/lorax_how_bad.mp3' },
+  { label: 'gramatik_v_nirvana_v_burr_lake_fire', value: '/gramatik_v_nirvana_v_burr_lake_fire.mp3' },
 ])
 
-const AUDIO_URL = ref(mp3Options.value[3].value)
+const getSongIndex = (label: string) => mp3Options.value.findIndex((opt: any) => opt?.label.toLowerCase().includes(label) || 0)
+const AUDIO_URL = ref(mp3Options.value[getSongIndex('cara')].value)
 
 watch(() => AUDIO_URL.value, async (newAudioURL) => {
   console.log({ newAudioURL })
   await loadAudio()
 });
 
-const MAX_ELEMENT_COUNT = 1024
-
-watch(() => isPlaying.value, (nextState) => {
-
-  if (!isPlaying.value && numOfElements.value[0] > 4) {
-       numOfElements.value = [numOfElements.value[0] - 4]
-  }
-
-  const timeout = setInterval(() => {
-
-    if (isPlaying.value && numOfElements.value[0] < MAX_ELEMENT_COUNT) {
-      numOfElements.value = [numOfElements.value[0] + 4]
-    } else if (!isPlaying.value && numOfElements.value[0] > 4) {
-      numOfElements.value = [numOfElements.value[0] - 4]
-    } else if (numOfElements.value >= MAX_ELEMENT_COUNT) {
-      clearTimeout(timeout)
-    }
-
-  }, 10);
-
-
-})
+const MAX_ELEMENT_COUNT = 768
 
 const meydaConfig = {
   bufferSize: 512,
@@ -149,7 +135,7 @@ const initMeyda = () => {
     source: analyser,
     bufferSize: meydaConfig.bufferSize,
     featureExtractors: meydaConfig.featureExtractors,
-    callback: (features: Meyda.Features) => {
+    callback: (features: MeydaFeatures) => {
       const currentEnergy = features.energy
       if (currentEnergy > energyThreshold.value && currentEnergy > previousEnergy.value) {
         // emit the beat event with energy data, win life
@@ -161,7 +147,6 @@ const initMeyda = () => {
 
   meydaAnalyzer.start()
 }
-
 
 const playAudio = async () => {
   if (!audioCtx) {
@@ -248,6 +233,100 @@ onBeforeUnmount(() => {
     audioCtx = null
   }
 })
+
+
+let removeInterval: any = null;
+let addInterval: any = null;
+
+// Function to stop element removal/addition intervals
+const stopIntervals = () => {
+  if (removeInterval) {
+    clearInterval(removeInterval);
+    removeInterval = null;
+  }
+  if (addInterval) {
+    clearInterval(addInterval);
+    addInterval = null;
+  }
+};
+
+
+const removeElements = () => {
+  stopIntervals(); // Stop any other intervals
+
+  stopAudio()
+  // Start a removal interval
+  removeInterval = setInterval(() => {
+    if (numOfElements.value[0] > 0) {
+      numOfElements.value = [numOfElements.value[0] - 4]; // Decrease elements
+    } else {
+      clearInterval(removeInterval); // Stop when count reaches 0
+    }
+  }, 10); // Throttle removal every 10ms
+};
+
+// don't be offended
+const handleDeadBeat = () => {
+
+  const lastBeatValue = !!lastBeat?.value ? lastBeat.value : 0
+  const timeSinceLastBeat = Date.now() - lastBeatValue
+
+  if (timeSinceLastBeat >= 1500) { // 1.5 seconds of inactivity
+    if (isPlaying.value) {
+      removeElements(); // Start removing elements if no beat for 1.5s
+    }
+  }
+};
+
+// Watch for `lastBeat` changes to determine when to start removing elements
+watch(lastBeat, (newValue) => {
+  if (!newValue) return;
+
+  // Check if the beat is dead after 1.5 seconds
+  setTimeout(() => {
+    handleDeadBeat();
+  }, 1500);
+});
+
+// Watch for changes in `isPlaying` and adjust element count accordingly
+watch(isPlaying, (nextState) => {
+  stopIntervals(); // Clear any ongoing intervals
+
+  if (!nextState) {
+    removeElements(); // Start removing elements when `isPlaying` becomes false
+  }
+
+  if (nextState) {
+    // Add elements back if isPlaying becomes true
+    addInterval = setInterval(() => {
+      if (numOfElements.value[0] < MAX_ELEMENT_COUNT) {
+        numOfElements.value = [numOfElements.value[0] + 4]; // Add 4 elements at a time
+      } else {
+        clearInterval(addInterval); // Stop adding when max element count is reached
+      }
+    }, 10); // Throttle addition every 10ms
+  }
+});
+
+
+onMounted(() => {
+  EventBus.on('beat', beat => {
+//    console.log('audioPlayer beat event detected:', beat);
+    currentEnergy.value = beat?.energy
+    if (highestEnergy.value < currentEnergy.value) {
+      highestEnergy.value = beat.energy
+    }
+    lastBeat.value = Date.now();
+  });
+});
+
+onBeforeUnmount(() => {
+  EventBus.off('beat');
+  stopIntervals();
+});
+
+
+
 </script>
 
 <style scoped>

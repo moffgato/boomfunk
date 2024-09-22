@@ -1,18 +1,12 @@
 <script setup lang="ts">
-import {Toaster} from 'vue-sonner'
+import { Toaster } from 'vue-sonner'
 import { useColorMode } from '@vueuse/core'
-import AppMenu from '@/components/menu/AppMenu.vue';
 
 const theme = useColorMode()
 theme.value = 'dark'
 
+
 </script>
-<!--
-
-.flex.w-full.justify-center.mb-4
-app-menu
-
--->
 
 <template lang="pug">
 .pb-4
@@ -23,7 +17,7 @@ app-menu
           div(:key='$route.path')
             component(:is='Component')
 
-  Toaster(position='bottom-right' :theme='theme' closeButton)
+  Toaster(position='bottom-right' theme='dark' closeButton)
 
 </template>
 
