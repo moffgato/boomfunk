@@ -40,7 +40,6 @@ const errorMessage = ref<string | null>(null)
 
 const mp3Options = ref([
   { label: 'When GM', value: '/when_gm.mp3' },
-
   { label: 'caravan_place__lone_digger', value: '/caravan_place__lone_digger.mp3' },
   { label: 'True Survivor', value: '/hoff_true_survivor.mp3' },
   { label: 'How Bad', value: '/lorax_how_bad.mp3' },
@@ -51,11 +50,8 @@ const getSongIndex = (label: string): number => {
   const index = mp3Options.value.findIndex((opt: any) => opt.label.toLowerCase().includes(label))
   return index !== -1 ? index : 0
 }
-const AUDIO_URL = ref(mp3Options.value[getSongIndex('caravan_place__lone_digger')].value)
-
-
+const AUDIO_URL = ref(mp3Options.value[getSongIndex('v_burr')].value)
 const audioBufferCache = ref<Record<string, AudioBuffer>>({})
-
 
 const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
   if (!newAudioURL || typeof newAudioURL !== 'string') {
@@ -165,6 +161,43 @@ const initMeyda = () => {
 }
 
 
+const handleAudioEnded = () => {
+  console.log('Audio playback ended.')
+
+  isPlaying.value = false
+
+  pauseTime = 0
+
+  // clear elements
+  numOfElements.value = [0]
+
+  if (meydaAnalyzer) {
+    meydaAnalyzer.stop()
+    meydaAnalyzer = null
+  }
+
+  if (analyser) {
+    analyser.disconnect()
+    analyser = null
+  }
+
+  if (source) {
+    source.disconnect()
+    source = null
+  }
+
+  currentEnergy.value = 0.0
+  highestEnergy.value = 0.0
+
+  toast({
+    title: 'Playback Finished',
+    description: `"${getCurrentSongLabel()}" has finished playing.`,
+    variant: 'info',
+  })
+
+  console.log('Playback state has been reset.')
+}
+
 const playAudio = async () => {
   if (!audioCtx) {
     audioCtx = getAudioContext()
@@ -199,6 +232,8 @@ const playAudio = async () => {
 
     source.connect(analyser)
     analyser.connect(audioCtx.destination)
+
+    source.onended = handleAudioEnded
 
 
     source.start(0, pauseTime)
@@ -397,7 +432,7 @@ const handleDeadBeat = () => {
   const lastBeatValue = lastBeat.value || 0
   const timeSinceLastBeat = Date.now() - lastBeatValue
 
-  if (timeSinceLastBeat >= 1500) {
+  if (timeSinceLastBeat >= 3500) {
     if (isPlaying.value) {
       removeElements()
     }
@@ -490,27 +525,27 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <Separator />
+        <Separator class="animate-fade-in duration-200" v-show='currentEnergy > 0 || highestEnergy > 0' />
 
-        <div class="flex justify-center gap-2">
-          <code class="text-slate-500 p-1 select-none flex flex-nowrap">
+        <div class="flex justify-center gap-2 animate-fade-in" v-show="currentEnergy > 0 || highestEnergy > 0">
+          <code class="w-full text-slate-500 p-1 select-none flex flex-nowrap justify-center">
             {{ `${highestEnergy.toFixed(8)}` }}
           </code>
           <Separator orientation="vertical" />
-          <code class="text-slate-500 p-1 select-none flex flex-nowrap">
+          <code class="w-full text-slate-500 p-1 select-none flex flex-nowrap justify-center">
             {{ `${currentEnergy.toFixed(8)}` }}
           </code>
         </div>
 
-        <Separator />
+        <Separator class="animate-fade-in" v-show='currentEnergy > 0 || highestEnergy > 0' />
 
         <div v-if="errorMessage" class="error-message">
           {{ errorMessage }}
         </div>
 
         <div v-if="isLoading" class="loading-spinner">
-          Loading...
         </div>
+
       </div>
     </div>
     <BeatGrid :isPlaying="isPlaying" :numOfElements="numOfElements" />
@@ -536,6 +571,10 @@ onBeforeUnmount(() => {
   color: white;
   font-size: 1rem;
   margin-top: 1rem;
+}
+
+.animate-fade-in {
+  animation: fadeInUp .35s ease;
 }
 </style>
 

@@ -1,23 +1,24 @@
 <template>
-  <div class="group beat-grid flex flex-wrap justify-center items-center">
-    <img
-      v-show="gridItems.length"
-      v-for="(_, index) in gridItems"
-      :key="index"
-      src="/solana_icon.svg"
-      :class="[
-        'audio-grid-item w-8 h-8 m-1 transition-margin duration-margin-500 transition-transform transition-color duration-color-500 transition-opacity duration-opacity-500 transition-filter durtation-filter-500 ease hover:hue-rotate-180',
+  <div class="group beat-grid flex flex-wrap justify-center items-center mt-4">
+    <TransitionGroup name="fade" tag="div" class="flex flex-wrap justify-center items-center transform-gpu">
+     <img
+       v-show="gridItems.length"
+       v-for="(_, index) in gridItems"
+       :key="index"
+       src="/solana_icon.svg"
+       :class="[
+         'audio-grid-item w-8 h-8 m-1 transition-margin duration-margin-500 transition-transform transition-color duration-color-500 transition-opacity duration-opacity-500 transition-filter durtation-filter-500 ease hover:hue-rotate-180',
 
-        { 'animate-pulse-scale': pulsingElements.includes(index) || (triggerEvenPulse && index % 2 === 0) },
-        { 'animate-no-pulse': !pulsingElements.includes(index) && currentEnergy > 100, },
-        { 'animate-fade-in': true },
-      ]"
-      :style="{
-        transform: pulsingElements.includes(index) ? `scale(${currentScale})` : 'scale(1)',
-        animationDuration: `${currentDuration}s`
-      }"
-      alt="Solana Icon"
-    />
+         { 'animate-pulse-scale': pulsingElements.includes(index) || (triggerEvenPulse && index % 2 === 0) },
+         { 'animate-no-pulse': !pulsingElements.includes(index) && currentEnergy > 100, },
+       ]"
+       :style="{
+         transform: pulsingElements.includes(index) ? `scale(${currentScale})` : 'scale(1)',
+         animationDuration: `${currentDuration}s`
+       }"
+       alt="Solana Icon"
+     />
+    </TransitionGroup>
   </div>
 </template>
 
@@ -73,17 +74,6 @@ watch(() => props.isPlaying, (nextState) => {
 });
 
 
-
-// watch(() => currentEnergy.value, (energy) => {
-//
-//   console.log({ 'energy!': energy, })
-//
-// })
-
-// watch(cumulativeEnergy, (newValue: any) => {
-//   console.log({ cumEnergy: newValue })
-// })
-
 // get a random subset of elements to pulse
 const getRandomElements = (count: number, total: number) => {
   const indices: number[] = []
@@ -116,12 +106,8 @@ const triggerPulse = (energy: number) => {
 
   triggerEvenPulse.value = cumulativeEnergy.value >= evenPulseThreshold;
 
-  // select a random subset of elements to pulse
-  // const numberOfElements = Math.floor(Math.random() * 5) + 3 // random 3 to 7 elements
   const numOfEl = Math.floor(energy >= 2 ? energy : 2)
   pulsingElements.value = getRandomElements(numOfEl, gridItems.value.length)
-
-  // console.log({ energy })
 
   isPulsing.value = true
   const colorClasses = [
@@ -227,9 +213,33 @@ onBeforeUnmount(() => {
   animation: pulse-wulse 3s, heartBeat .7s ease-in-out infinite;
 }
 
-.animate-element-enter {
-  animation:  .2s ease;
+.fade-enter-active {
+  transition: opacity 0.6s ease-in-out, transform 0.6s ease-in-out;
 }
+
+.fade-leave-active {
+  transition: opacity 0.3s ease-in-out;
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.fade-enter-to {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.fade-leave-from {
+  opacity: 1;
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
 
 </style>
 
