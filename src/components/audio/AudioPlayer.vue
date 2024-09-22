@@ -1,88 +1,74 @@
-<!--
-
-  who needs controls anyways?
-
-  <AudioSelect
-:modelValue="AUDIO_URL.value"
-:audioOptions='mp3Options'
-@update:modelValue="() => { console.log('mf') }"
-/>
-
-<div class="w-[50vw] flex gap-2">
-<Label>{{ numOfElements[0] }}</Label>
-<Slider v-model='numOfElements' :default-value='[4]' :min='4' :max="MAX_ELEMENT_COUNT" :step="4" />
-</div>
-
--->
-
 <template>
   <div class="player">
     <div class="flex">
+      <div class="flex flex-col justify-center w-full w-[300px] gap-0">
+        <div class="flex justify-center gap-1">
+          <AudioSelect
+            v-model='AUDIO_URL'
+            :audioOptions='mp3Options'
+          />
+          <div class="flex justify-center sounding-butts">
+            <Button
+              variant="outline"
+              class="text-white px-4 py-2 rounded mb-4"
+              @click="togglePlay"
+              aria-label="Play or Pause Audio"
+              >
+              {{ isPlaying ? "Pause" : "Play" }}
+            </Button>
+            <Button
+              variant="outline"
+              class="text-white px-4 py-2 rounded mb-4"
+              @click="resetAudio"
+              aria-label="Reset Audio"
+              >
+              Reset
+            </Button>
+          </div>
+        </div>
 
-    <div class="flex flex-col justify-center w-full w-[300px] gap-0">
+        <Separator />
 
-      <div class="flex justify-center sounding-butts">
-        <Button
-          variant="outline"
-          class="text-white px-4 py-2 rounded mb-4"
-          @click="togglePlay"
-          aria-label="Play or Pause Audio"
-          >
-          {{ isPlaying ? "Pause" : "Play" }}
-        </Button>
+        <div class="flex justify-center gap-2">
+          <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${highestEnergy.toFixed(8)}` }}</code>
+          <Separator orientation="vertical" />
+          <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${currentEnergy.toFixed(8)}` }}</code>
+        </div>
+
+        <Separator />
+
+        <!-- Error Message -->
+        <div v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </div>
       </div>
-
-      <Separator />
-
-      <div class="flex justify-center gap-2">
-        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${highestEnergy.toFixed(8)}` }}</code>
-        <Separator orientation="vertical" />
-        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${currentEnergy.toFixed(8)}` }}</code>
-      </div>
-
-      <Separator />
-
-    </div>
-
     </div>
     <BeatGrid :isPlaying='isPlaying' :numOfElements="numOfElements" />
   </div>
 </template>
 
-
-
-
 <script setup lang="ts">
-
 /*
-
-  script manages audio, loads it, play/pause etc
-  we emit an event for 'beat' so BeatGrid.vue can trigger on it.
-  works totally flawlessy, the DOM loves being dominated.
-
-  we also control the amount of elements in the BeatGrid from this component.
-
-  the animation has some minor logic around energy and intensity.
-  essentially on beat we animated a % of the elements relative to energy.
-  at certain cumulative energy we slam animation on the rest of the elements to create a background(?) feel.
-
-  */
-
+  Script manages audio loading, playback, beat detection, etc.
+*/
 
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Button } from '../ui/button'
 import { Separator } from '../ui/separator'
 import BeatGrid from './BeatGrid.vue'
+import AudioSelect from './Select.vue'
 import { EventBus } from '../../lib'
-import { fetchAudioBuffer } from '../../lib/utils'
+import { fetchAudioBuffer, getAudioContext, closeAudioContext } from '../../lib/utils'
 import Meyda from 'meyda'
+import debounce from 'lodash.debounce'
 
-// jesus will get you in the end.
+
 type MeydaAnalyzer = any
 type MeydaFeatures = any
 
 
-let isPlaying = ref(false)
+const isPlaying = ref(false)
+const isLoading = ref(false)
 let audioCtx: AudioContext | null = null
 let source: AudioBufferSourceNode | null = null
 let analyser: AnalyserNode | null = null
@@ -92,28 +78,56 @@ let startTime: number = 0
 let pauseTime: number = 0
 let audioBuffer: AudioBuffer | null = null
 
-let numOfElements = ref([0])
+const numOfElements = ref([0])
 
-let lastBeat = ref(0)
-let currentEnergy = ref(0.0)
-let highestEnergy = ref(0.0)
+const lastBeat = ref(0)
+const currentEnergy = ref(0.0)
+const highestEnergy = ref(0.0)
+
+const errorMessage = ref<string | null>(null)
 
 const mp3Options = ref([
   { label: 'When GM', value: '/when_gm.mp3', },
-//  { label: 'attack_on_titan', value: '/hiroyuki_sawano_attack_on_titan_suite.mp3', },
+
   { label: 'caravan_place__lone_digger', value: '/caravan_place__lone_digger.mp3' },
   { label: 'True Survivor', value: '/hoff_true_survivor.mp3' },
   { label: 'How Bad', value: '/lorax_how_bad.mp3' },
   { label: 'gramatik_v_nirvana_v_burr_lake_fire', value: '/gramatik_v_nirvana_v_burr_lake_fire.mp3' },
 ])
 
-const getSongIndex = (label: string) => mp3Options.value.findIndex((opt: any) => opt?.label.toLowerCase().includes(label) || 0)
-const AUDIO_URL = ref(mp3Options.value[getSongIndex('cara')].value)
+const getSongIndex = (label: string): number => {
+  const index = mp3Options.value.findIndex((opt: any) => opt.label.toLowerCase().includes(label))
+  return index !== -1 ? index : 0
+}
+const AUDIO_URL = ref(mp3Options.value[getSongIndex('caravan_place__lone_digger')].value)
 
-watch(() => AUDIO_URL.value, async (newAudioURL) => {
-  console.log({ newAudioURL })
-  await loadAudio()
-});
+const debouncedLoadAudio = debounce(async (newAudioURL: string) => {
+  if (!newAudioURL || typeof newAudioURL !== 'string') {
+    console.error('Invalid AUDIO_URL:', newAudioURL)
+    errorMessage.value = 'Invalid audio selection. Please choose a valid track.'
+    return
+  }
+
+  const wasPlaying = isPlaying.value
+
+  if (wasPlaying) {
+    stopAudio()
+  }
+
+  pauseTime = 0
+
+  await loadAudio(newAudioURL)
+
+  if (wasPlaying) {
+    await playAudio()
+  }
+}, 300)
+
+
+watch(AUDIO_URL, (newAudioURL, oldAudioURL) => {
+  console.log(`AUDIO_URL changed from ${oldAudioURL} to ${newAudioURL}`)
+  debouncedLoadAudio(newAudioURL)
+})
 
 const MAX_ELEMENT_COUNT = 768
 
@@ -126,17 +140,35 @@ const energyThreshold = ref(0.5)
 const previousEnergy = ref(0)
 
 
-const loadAudio = async () => {
+const audioBufferCache = ref<Record<string, AudioBuffer>>({})
+
+
+const loadAudio = async (url: string) => {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    audioCtx = getAudioContext()
+    console.log('AudioContext initialized.')
   }
 
-  if (!audioBuffer) {
-    try {
-      audioBuffer = await fetchAudioBuffer(audioCtx, AUDIO_URL.value)
-    } catch (error) {
-      console.error('Error loading audio:', error)
+  try {
+    console.log(`Loading audio from URL: ${url}`)
+    isLoading.value = true
+
+    if (audioBufferCache.value[url]) {
+      audioBuffer = audioBufferCache.value[url]
+      console.log('Loaded AudioBuffer from cache.')
+    } else {
+      const fetchedBuffer = await fetchAudioBuffer(audioCtx, url)
+      audioBuffer = fetchedBuffer
+      audioBufferCache.value[url] = fetchedBuffer
+      console.log('AudioBuffer loaded and cached.')
     }
+
+    errorMessage.value = null
+  } catch (error) {
+    console.error('Error loading audio:', error)
+    errorMessage.value = 'Failed to load audio. Please select a different track.'
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -150,55 +182,74 @@ const initMeyda = () => {
     bufferSize: meydaConfig.bufferSize,
     featureExtractors: meydaConfig.featureExtractors,
     callback: (features: MeydaFeatures) => {
-      const currentEnergy = features.energy
-      if (currentEnergy > energyThreshold.value && currentEnergy > previousEnergy.value) {
-        // emit the beat event with energy data, win life
-        EventBus.emit('beat', { energy: currentEnergy })
+      const currentEnergyValue = features.energy
+      if (currentEnergyValue > energyThreshold.value && currentEnergyValue > previousEnergy.value) {
+
+        EventBus.emit('beat', { energy: currentEnergyValue })
       }
-      previousEnergy.value = currentEnergy
+      previousEnergy.value = currentEnergyValue
     }
   })
 
   meydaAnalyzer.start()
+  console.log('Meyda Analyzer started.')
 }
+
+
 
 const playAudio = async () => {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    audioCtx = getAudioContext()
+    console.log('AudioContext initialized.')
   }
 
   try {
-    // decode audio
-    await loadAudio()
+    if (source) {
+      stopAudio()
+    }
 
-    // create buffer
+    if (!audioBuffer) {
+      console.error('No audio buffer loaded. Cannot play audio.')
+      errorMessage.value = 'No audio loaded. Please select a track.'
+      return
+    }
+
+
     source = audioCtx.createBufferSource()
     source.buffer = audioBuffer
     source.loop = false
 
-    // creates AnalyserNode
+
     analyser = audioCtx.createAnalyser()
     analyser.fftSize = 2048
 
-    // connect the nodes. it's a thing
+
     source.connect(analyser)
     analyser.connect(audioCtx.destination)
 
-    // start playback
+
     source.start(0, pauseTime)
     startTime = audioCtx.currentTime - pauseTime
+    console.log('Audio playback started.')
+
 
     initMeyda()
 
   } catch (error) {
     console.error('Failed to play audio or detect beats:', error)
+    errorMessage.value = 'Failed to play audio. Please try again.'
   }
 }
 
-const stopAudio = () => {
 
+const stopAudio = () => {
   if (source) {
-    source.stop()
+    try {
+      source.stop()
+      console.log('Audio source stopped.')
+    } catch (e) {
+      console.warn('Source already stopped or cannot be stopped:', e)
+    }
     source.disconnect()
     source = null
   }
@@ -211,48 +262,87 @@ const stopAudio = () => {
   if (meydaAnalyzer) {
     meydaAnalyzer.stop()
     meydaAnalyzer = null
+    console.log('Meyda Analyzer stopped.')
   }
 
   if (audioCtx && audioCtx.state === 'running') {
     pauseTime = audioCtx.currentTime - startTime
+    audioCtx.suspend().then(() => {
+      console.log('AudioContext suspended.')
+    }).catch((error) => {
+      console.error('Error suspending AudioContext:', error)
+    })
   }
 }
 
 
 const togglePlay = async () => {
-  if (isPlaying.value) {
-    stopAudio()
-    isPlaying.value = false
-    // suspend AudioContext to comply with browser policies
-    // meme/docs:
-    // https://developer.chrome.com/blog/autoplay/#webaudio
-    if (audioCtx && audioCtx.state === 'running') {
-      await audioCtx.suspend()
+  try {
+    if (isPlaying.value) {
+
+      stopAudio()
+      isPlaying.value = false
+      console.log('Playback paused.')
+    } else {
+
+
+      if (audioCtx && audioCtx.state === 'suspended') {
+        try {
+          await audioCtx.resume()
+          console.log('AudioContext resumed.')
+        } catch (error) {
+          console.error('Error resuming AudioContext:', error)
+          errorMessage.value = 'Failed to resume audio context.'
+          return
+        }
+      }
+
+
+      await playAudio()
+      isPlaying.value = true
+      console.log('Playback started.')
     }
-  } else {
-    // resume AudioContext if suspended
-    if (audioCtx && audioCtx.state === 'suspended') {
-      await audioCtx.resume()
-    }
-    await playAudio()
-    isPlaying.value = true
+  } catch (error) {
+    console.error('Error toggling playback:', error)
+    errorMessage.value = 'An error occurred while toggling playback.'
   }
 }
 
-// cleanup
-onBeforeUnmount(() => {
-  stopAudio()
-  if (audioCtx) {
-    audioCtx.close()
-    audioCtx = null
+
+const resetAudio = async () => {
+  try {
+    const wasPlaying = isPlaying.value
+
+    stopAudio()
+
+    pauseTime = 0
+
+    await loadAudio(AUDIO_URL.value)
+
+    if (wasPlaying) {
+      await playAudio()
+    }
+
+    console.log('Playback reset to the beginning.')
+  } catch (error) {
+    console.error('Error resetting playback:', error)
+    errorMessage.value = 'An error occurred while resetting playback.'
   }
+}
+
+
+onBeforeUnmount(async () => {
+  stopAudio()
+  stopIntervals()
+  await closeAudioContext()
 })
+
 
 
 let removeInterval: any = null;
 let addInterval: any = null;
 
-// Function to stop element removal/addition intervals
+
 const stopIntervals = () => {
   if (removeInterval) {
     clearInterval(removeInterval);
@@ -264,84 +354,86 @@ const stopIntervals = () => {
   }
 };
 
-
 const removeElements = () => {
-  stopIntervals(); // Stop any other intervals
+  stopIntervals();
 
   stopAudio()
   isPlaying.value = false
-  // Start a removal interval
+
   removeInterval = setInterval(() => {
     if (numOfElements.value[0] > 0) {
-      numOfElements.value = [numOfElements.value[0] - 4]; // Decrease elements
+      numOfElements.value = [numOfElements.value[0] - 4];
     } else {
-      clearInterval(removeInterval); // Stop when count reaches 0
+      clearInterval(removeInterval);
     }
-  }, 10); // Throttle removal every 10ms
+  }, 10);
 };
 
-// don't be offended
-const handleDeadBeat = () => {
 
+const handleDeadBeat = () => {
   const lastBeatValue = !!lastBeat?.value ? lastBeat.value : 0
   const timeSinceLastBeat = Date.now() - lastBeatValue
 
-  if (timeSinceLastBeat >= 1500) { // 1.5 seconds of inactivity
+  if (timeSinceLastBeat >= 1500) {
     if (isPlaying.value) {
-      removeElements(); // Start removing elements if no beat for 1.5s
+      removeElements();
     }
   }
 };
 
-// Watch for `lastBeat` changes to determine when to start removing elements
+
 watch(lastBeat, (newValue) => {
   if (!newValue) return;
 
-  // Check if the beat is dead after 1.5 seconds
+
   setTimeout(() => {
-    handleDeadBeat();
-  }, 1500);
+    handleDeadBeat()
+  }, 1500)
 });
 
-// Watch for changes in `isPlaying` and adjust element count accordingly
+
 watch(isPlaying, (nextState) => {
-  stopIntervals(); // Clear any ongoing intervals
+  stopIntervals()
 
   if (!nextState) {
-    removeElements(); // Start removing elements when `isPlaying` becomes false
+    removeElements()
   }
 
   if (nextState) {
-    // Add elements back if isPlaying becomes true
+
     addInterval = setInterval(() => {
       if (numOfElements.value[0] < MAX_ELEMENT_COUNT) {
-        numOfElements.value = [numOfElements.value[0] + 4]; // Add 4 elements at a time
+        numOfElements.value = [numOfElements.value[0] + 4];
       } else {
-        clearInterval(addInterval); // Stop adding when max element count is reached
+        clearInterval(addInterval);
       }
-    }, 10); // Throttle addition every 10ms
+    }, 10);
   }
 });
 
 
-onMounted(() => {
-  EventBus.on('beat', beat => {
-//    console.log('audioPlayer beat event detected:', beat);
-    currentEnergy.value = beat?.energy
+onMounted(async () => {
+  if (AUDIO_URL.value) {
+    await loadAudio(AUDIO_URL.value)
+  } else {
+    errorMessage.value = 'No audio selected.'
+  }
+
+  EventBus.on('beat', (beat) => {
+
+    currentEnergy.value = beat?.energy || 0
     if (highestEnergy.value < currentEnergy.value) {
       highestEnergy.value = beat.energy
     }
-    lastBeat.value = Date.now();
-  });
-});
+    lastBeat.value = Date.now()
+  })
+})
+
 
 onBeforeUnmount(() => {
   EventBus.off('beat');
   stopIntervals();
 });
-
-
-
 </script>
 
 <style scoped>
@@ -352,5 +444,12 @@ onBeforeUnmount(() => {
   justify-content: center;
   padding: 2rem;
 }
+
+.error-message {
+  color: red;
+  margin-top: 1rem;
+  text-align: center;
+}
 </style>
+
 
