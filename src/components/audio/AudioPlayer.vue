@@ -17,14 +17,14 @@
 
 <template>
   <div class="player">
-    <div class="flex gap-2 items-baseline">
+    <div class="flex">
 
-    <div class="flex justify-between w-full min-w-[300px] gap-2">
+    <div class="flex flex-col justify-center w-full w-[300px] gap-0">
 
-      <div class="flex sounding-butts">
+      <div class="flex justify-center sounding-butts">
         <Button
           variant="outline"
-          class="text-white px-4 py-2 rounded hover:bg-red-600 mb-4"
+          class="text-white px-4 py-2 rounded mb-4"
           @click="togglePlay"
           aria-label="Play or Pause Audio"
           >
@@ -32,11 +32,15 @@
         </Button>
       </div>
 
-      <div class="flex w-[200px] gap-2">
-        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${highestEnergy}` }}</code>
-        <Separator orientation="vertical" class="h-[69%]" />
-        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${currentEnergy}` }}</code>
+      <Separator />
+
+      <div class="flex justify-center gap-2">
+        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${highestEnergy.toFixed(8)}` }}</code>
+        <Separator orientation="vertical" />
+        <code class="text-slate-500 p-1 select-none flex flex-nowrap">{{ `${currentEnergy.toFixed(8)}` }}</code>
       </div>
+
+      <Separator />
 
     </div>
 
